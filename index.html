@@ -17,7 +17,11 @@
   #meta .sub { font-size: 17px; color: #7df9ff; }
   #hint { position: absolute; bottom: 18px; left: 16px;
     font-size: 17px; padding: 8px 18px; white-space: nowrap; }
-  #btns { position: absolute; bottom: 18px; right: 16px; display: flex; gap: 8px; }
+  @media (max-width: 700px) {
+    #hint { white-space: normal; max-width: 44vw; font-size: 14px; line-height: 1.4; }
+    #btns { max-width: 52vw; }
+  }
+  #btns { position: absolute; bottom: 18px; right: 16px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; max-width: 94vw; }
   #btns button { font-family: inherit; font-size: 16px; font-weight: bold; color: #fff;
     background: rgba(8, 16, 34, 0.82); border: 2px solid #3a5a8c; border-radius: 12px;
     padding: 9px 13px; cursor: pointer; }
@@ -50,7 +54,7 @@
 <canvas id="c"></canvas>
 <div id="hud" class="pill">⏱ <span id="time">00:00.0</span><br><span class="sub">MOVES <span id="moves">0</span></span> <span id="chaosTag" class="chaos hidden">· CHAOS <span id="chaosIn">15</span>s</span></div>
 <div id="meta" class="pill"><span id="level">R1/6 · MINI 2×2</span><br><span class="sub">BEST <span id="best">--:--</span></span></div>
-<div id="hint" class="pill">WASD/QE = twist · Arrows = orbit · SPACE = scramble</div>
+<div id="hint" class="pill">WASD/QE = twist · Arrows = orbit · SPACE = scramble · 1–7 = rounds</div>
 <div id="btns">
   <button id="bScramble">SCRAMBLE</button>
   <button id="bChaos">CHAOS: OFF</button>
@@ -58,6 +62,10 @@
   <button id="b2" data-n="2">2×2</button>
   <button id="b3" data-n="3">3×3</button>
   <button id="b4" data-n="4">4×4</button>
+  <button id="b5" data-n="5">5×5</button>
+  <button id="bMirror" data-round="4">MIRROR</button>
+  <button id="bPillow" data-round="5">PILLOW</button>
+  <button id="bPyr" data-round="6">PYRAMINX</button>
 </div>
 <div id="title" class="overlay">
   <h1><span class="c1">RUBIK'S</span> <span class="c2">CUBE</span> <span class="c3">3D</span></h1>
@@ -65,7 +73,7 @@
   <p class="rounds"><b>1</b> Mini 2×2 &nbsp;·&nbsp; <b>2</b> Classic 3×3 &nbsp;·&nbsp; <b>3</b> Revenge 4×4<br>
   <b>4</b> Professor 5×5 &nbsp;·&nbsp; <b>5</b> Mirror Cube &nbsp;·&nbsp; <b>6</b> Pillow Cube<br>
   <b>7</b> Pyraminx — the pyramid finale<br>
-  Solve each round to advance. Beat the chaos.</p>
+  Solve each round to advance — or tap any round button below to play it directly. Beat the chaos.</p>
   <p class="big" id="titleCta">Press SPACE or tap ROUNDS to start</p>
 </div>
 <div id="over" class="overlay hidden">
@@ -552,7 +560,7 @@ function fmt(ms) {
   return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') + '.' + d;
 }
 function bestKey() {
-  return S.mode === 'campaign' ? 'rubik3d-best-campaign' : 'rubik3d-best-' + N;
+  return S.mode === 'campaign' ? 'rubik3d-best-campaign' : 'rubik3d-best-' + (SHAPE === 'cube' ? N : SHAPE);
 }
 function getBest() { try { const v = localStorage.getItem(bestKey()); return v ? parseFloat(v) : null; } catch (e) { return null; } }
 function setBest(ms) { try { localStorage.setItem(bestKey(), String(ms)); } catch (e) { /* ignore */ } }
@@ -567,13 +575,16 @@ function updateHUD() {
   el('moves').textContent = S.mode === 'campaign' ? S.totalMoves + S.moves : S.moves;
   el('level').textContent = S.mode === 'campaign'
     ? 'R' + (S.roundIdx + 1) + '/7 · ' + ROUNDS[S.roundIdx].label
-    : N + '×' + N;
+    : (SHAPE === 'cube' ? N + '×' + N : ROUNDS[S.roundIdx].label);
   el('chaosTag').classList.toggle('hidden', !S.chaos);
   el('bChaos').textContent = 'CHAOS: ' + (S.chaos ? 'ON' : 'OFF');
   el('bChaos').classList.toggle('on', S.chaos);
   el('bRounds').classList.toggle('lvl-on', S.mode === 'campaign');
   for (const b of document.querySelectorAll('#btns button[data-n]')) {
     b.classList.toggle('lvl-on', S.mode === 'free' && parseInt(b.dataset.n, 10) === N);
+  }
+  for (const b of document.querySelectorAll('#btns button[data-round]')) {
+    b.classList.toggle('lvl-on', S.mode === 'free' && SHAPE !== 'cube' && parseInt(b.dataset.round, 10) === S.roundIdx);
   }
   el('time').textContent = fmt(displayMs());
 }
@@ -617,6 +628,10 @@ function startCampaign() {
   S.totalMs = 0; S.totalMoves = 0;
   startRound(0);
 }
+function playRound(i) { // GitHub-only: jump straight to any round in free play
+  S.mode = 'free';
+  startRound(i);
+}
 function roundSolved() {
   const roundMs = (gameTime - S.t0) * 1000;
   S.totalMs += roundMs;
@@ -657,7 +672,7 @@ function freeSolved() {
   el('solvedBanner').classList.add('show');
   el('overTitle').textContent = 'SOLVED!';
   el('finalStats').textContent = 'Time ' + fmt(S.finalMs) + ' · ' + S.moves + (S.moves === 1 ? ' move' : ' moves');
-  el('bestLine').textContent = 'Best time ' + fmt(getBest()) + ' (' + N + '×' + N + ')';
+  el('bestLine').textContent = 'Best time ' + fmt(getBest()) + ' (' + (SHAPE === 'cube' ? N + '×' + N : ROUNDS[S.roundIdx].label) + ')';
   updateHUD();
 }
 function onSolved() {
@@ -970,6 +985,10 @@ window.addEventListener('keydown', e => {
   else if (k === '1') resetLevel(2);
   else if (k === '2') resetLevel(3);
   else if (k === '3') resetLevel(4);
+  else if (k === '4') playRound(3);
+  else if (k === '5') playRound(4);
+  else if (k === '6') playRound(5);
+  else if (k === '7') playRound(6);
   else if (SHAPE === 'pyraminx' && PYR_KEYMAP[k]) {
     if (S.state === 'title') { hideTitle(); S.state = 'ready'; }
     if (S.state === 'won' || S.state === 'roundDone') return;
@@ -996,6 +1015,9 @@ el('bChaos').addEventListener('click', () => { S.chaos = !S.chaos; S.lastChaos =
 el('bRounds').addEventListener('click', () => { lastInteract = gameTime; startCampaign(); });
 for (const b of document.querySelectorAll('#btns button[data-n]')) {
   b.addEventListener('click', () => resetLevel(parseInt(b.dataset.n, 10)));
+}
+for (const b of document.querySelectorAll('#btns button[data-round]')) {
+  b.addEventListener('click', () => { lastInteract = gameTime; playRound(parseInt(b.dataset.round, 10)); });
 }
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;

@@ -9,6 +9,7 @@ Play it here: https://zogwob.github.io/rubik-cube-3d/
 - **Mouse / touch:** drag a face to twist it, drag the background to orbit the camera.
 - **Keyboard:** U D F L R B to twist faces (hold Shift to reverse), W A S D / Q E also twist, arrow keys orbit the camera, Space scrambles, R restarts.
 - **Modes:** campaign through all 7 rounds, free play, or chaos mode (re-scrambles one move every 15 seconds).
+- **Round picker (GitHub version only):** the buttons at the bottom — 2×2, 3×3, 4×4, 5×5, MIRROR, PILLOW, PYRAMINX — jump straight to any round, or press keys 1–7. (The submitted make.fun entry is campaign-only.)
 
 ## Tech
 
