@@ -1,1 +1,1110 @@
-<!-- placeholder, replaced by file upload -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Rubik's Cube 3D — 7 rounds, twist it, beat the chaos</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0a0f1e;
+    font-family: "DejaVu Sans", Arial, Helvetica, sans-serif; }
+  #c { display: block; width: 100%; height: 100%; touch-action: none; }
+  .pill { position: absolute; background: rgba(8, 16, 34, 0.82); color: #fff; border-radius: 14px;
+    padding: 8px 16px; font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.35); }
+  #hud { position: absolute; top: 14px; left: 14px; font-size: 26px; line-height: 1.3; }
+  #hud .sub { font-size: 17px; color: #ffd94d; }
+  #hud .chaos { font-size: 17px; color: #ff5d8f; }
+  #meta { position: absolute; top: 14px; right: 14px; text-align: right; font-size: 26px; line-height: 1.3; }
+  #meta .sub { font-size: 17px; color: #7df9ff; }
+  #hint { position: absolute; bottom: 18px; left: 16px;
+    font-size: 17px; padding: 8px 18px; white-space: nowrap; }
+  #btns { position: absolute; bottom: 18px; right: 16px; display: flex; gap: 8px; }
+  #btns button { font-family: inherit; font-size: 16px; font-weight: bold; color: #fff;
+    background: rgba(8, 16, 34, 0.82); border: 2px solid #3a5a8c; border-radius: 12px;
+    padding: 9px 13px; cursor: pointer; }
+  #btns button:hover { border-color: #ffd94d; }
+  #btns button.on { border-color: #ff5d8f; color: #ffb3c8; }
+  #btns button.lvl-on { border-color: #7df9ff; color: #bff6ff; }
+  .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; color: #fff; text-align: center; background: rgba(5, 10, 24, 0.45);
+    pointer-events: none; }
+  .overlay h1 { font-size: 62px; margin: 0 0 8px 0; letter-spacing: 2px;
+    text-shadow: 0 4px 0 rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.5); }
+  .overlay h1 .c1 { color: #ffd94d; } .overlay h1 .c2 { color: #ff5d8f; } .overlay h1 .c3 { color: #7df9ff; }
+  .overlay h2 { font-size: 25px; margin: 0 0 18px 0; font-weight: normal; color: #ffe9a8; }
+  .overlay p { font-size: 19px; margin: 6px 0; max-width: 660px; line-height: 1.5; }
+  .overlay .big { font-size: 22px; font-weight: bold; margin-top: 16px; }
+  #title { justify-content: flex-start; padding-top: 30px; }
+  #title h1 { font-size: 54px; }
+  #title .rounds { font-size: 20px; line-height: 1.7; color: #dff3ff; }
+  #title .rounds b { color: #ffd94d; }
+  #solvedBanner { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%) scale(0.8);
+    font-size: 44px; font-weight: bold; color: #fff; background: rgba(8, 16, 34, 0.85);
+    border: 3px solid #ffd94d; border-radius: 20px; padding: 14px 30px; opacity: 0;
+    pointer-events: none; transition: opacity 0.25s, transform 0.25s; text-shadow: 0 3px 12px rgba(0,0,0,0.5);
+    white-space: nowrap; }
+  #solvedBanner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud" class="pill">⏱ <span id="time">00:00.0</span><br><span class="sub">MOVES <span id="moves">0</span></span> <span id="chaosTag" class="chaos hidden">· CHAOS <span id="chaosIn">15</span>s</span></div>
+<div id="meta" class="pill"><span id="level">R1/6 · MINI 2×2</span><br><span class="sub">BEST <span id="best">--:--</span></span></div>
+<div id="hint" class="pill">WASD/QE = twist · Arrows = orbit · SPACE = scramble</div>
+<div id="btns">
+  <button id="bScramble">SCRAMBLE</button>
+  <button id="bChaos">CHAOS: OFF</button>
+  <button id="bRounds" class="lvl-on">ROUNDS</button>
+  <button id="b2" data-n="2">2×2</button>
+  <button id="b3" data-n="3">3×3</button>
+  <button id="b4" data-n="4">4×4</button>
+</div>
+<div id="title" class="overlay">
+  <h1><span class="c1">RUBIK'S</span> <span class="c2">CUBE</span> <span class="c3">3D</span></h1>
+  <h2>Seven puzzles. One campaign.</h2>
+  <p class="rounds"><b>1</b> Mini 2×2 &nbsp;·&nbsp; <b>2</b> Classic 3×3 &nbsp;·&nbsp; <b>3</b> Revenge 4×4<br>
+  <b>4</b> Professor 5×5 &nbsp;·&nbsp; <b>5</b> Mirror Cube &nbsp;·&nbsp; <b>6</b> Pillow Cube<br>
+  <b>7</b> Pyraminx — the pyramid finale<br>
+  Solve each round to advance. Beat the chaos.</p>
+  <p class="big" id="titleCta">Press SPACE or tap ROUNDS to start</p>
+</div>
+<div id="over" class="overlay hidden">
+  <h1 id="overTitle">SOLVED!</h1>
+  <h2 id="finalStats">Time 00:00.0 · 0 moves</h2>
+  <p id="bestLine">Best time --:--</p>
+  <p class="big">It works. First try. — Press R to play again</p>
+</div>
+<div id="solvedBanner">★ SOLVED! ★</div>
+<script src="game/vendor/three.min.js"></script>
+<script>
+const THREE = window.THREE;
+(function () {
+'use strict';
+
+// ------------------------------------------------------------ setup
+const params = new URLSearchParams(location.search);
+const FAST = params.get('fast') === '1';   // ?fast=1: no AA, no shadows (swiftshader speed)
+const FIXED = params.get('fixed') === '1'; // ?fixed=1: manual frame stepping via __step()
+const CHAOS_SEC = parseFloat(params.get('chaos') || '15');
+const SEED = parseInt(params.get('seed') || '7', 10);
+let seedState = SEED >>> 0;
+function rnd() { seedState = (seedState * 1664525 + 1013904223) >>> 0; return seedState / 4294967296; }
+function randi(a, b) { return a + Math.floor(rnd() * (b - a + 1)); }
+function pick(arr) { return arr[Math.floor(rnd() * arr.length)]; }
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !FAST });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = !FAST;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0f1e);
+scene.fog = new THREE.Fog(0x0a0f1e, 26, 60);
+
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 200);
+
+// lights: warm key + magenta/cyan neon rims + hemisphere fill
+scene.add(new THREE.HemisphereLight(0x8fb8ff, 0x1a0b2e, 0.75));
+const key = new THREE.DirectionalLight(0xfff2d9, 1.9);
+key.position.set(6, 10, 7);
+key.castShadow = !FAST;
+key.shadow.mapSize.set(1024, 1024);
+key.shadow.camera.left = -8; key.shadow.camera.right = 8;
+key.shadow.camera.top = 8; key.shadow.camera.bottom = -8;
+scene.add(key);
+const rimM = new THREE.PointLight(0xff2d95, 1.5, 40); rimM.position.set(-7, 3, -5); scene.add(rimM);
+const rimC = new THREE.PointLight(0x00e5ff, 1.4, 40); rimC.position.set(7, -2, -6); scene.add(rimC);
+
+// floor + neon ring under the cube
+const floor = new THREE.Mesh(
+  new THREE.CircleGeometry(11, 48),
+  new THREE.MeshStandardMaterial({ color: 0x0a1220, roughness: 0.5, metalness: 0.5 })
+);
+floor.rotation.x = -Math.PI / 2; floor.position.y = -3.4; floor.receiveShadow = true;
+scene.add(floor);
+const ring = new THREE.Mesh(
+  new THREE.TorusGeometry(3.1, 0.07, 12, 80),
+  new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xff2d95, emissiveIntensity: 1.6, roughness: 0.4 })
+);
+ring.rotation.x = -Math.PI / 2; ring.position.y = -3.38;
+scene.add(ring);
+const ring2 = new THREE.Mesh(
+  new THREE.TorusGeometry(3.9, 0.04, 12, 80),
+  new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x00e5ff, emissiveIntensity: 1.4, roughness: 0.4 })
+);
+ring2.rotation.x = -Math.PI / 2; ring2.position.y = -3.38;
+scene.add(ring2);
+
+// floating dust for depth
+const dustGeo = new THREE.BufferGeometry();
+{
+  const n = 160, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    pos[i * 3] = (rnd() - 0.5) * 26; pos[i * 3 + 1] = rnd() * 12 - 3; pos[i * 3 + 2] = (rnd() - 0.5) * 26;
+  }
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+}
+const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0x8fb8ff, size: 0.07, transparent: true, opacity: 0.55 }));
+scene.add(dust);
+
+// ------------------------------------------------------------ rounds + cube model
+const ROUNDS = [
+  { id: 'mini', label: 'MINI 2×2', n: 2, shape: 'cube' },
+  { id: 'classic', label: 'CLASSIC 3×3', n: 3, shape: 'cube' },
+  { id: 'revenge', label: 'REVENGE 4×4', n: 4, shape: 'cube' },
+  { id: 'professor', label: 'PROFESSOR 5×5', n: 5, shape: 'cube' },
+  { id: 'mirror', label: 'MIRROR CUBE', n: 3, shape: 'mirror' },
+  { id: 'pillow', label: 'PILLOW CUBE', n: 3, shape: 'pillow' },
+  { id: 'pyraminx', label: 'PYRAMINX', n: 3, shape: 'pyraminx' },
+];
+const FACE_COLORS = { px: 0xff1744, nx: 0xff9100, py: 0xf5f5f5, ny: 0xffd500, pz: 0x00c853, nz: 0x2962ff };
+// mirror cube: one gold shade per face direction (solved = uniform shade per face)
+const MIRROR_COLORS = { px: 0xffe066, nx: 0xf5b301, py: 0xfff8d6, ny: 0xd98e00, pz: 0xffc93c, nz: 0xa86f00 };
+const AXES = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
+const FACES = {
+  U: { axis: 'y', layer: 1, dir: -1 }, D: { axis: 'y', layer: -1, dir: 1 },
+  R: { axis: 'x', layer: 1, dir: -1 }, L: { axis: 'x', layer: -1, dir: 1 },
+  F: { axis: 'z', layer: 1, dir: -1 }, B: { axis: 'z', layer: -1, dir: 1 },
+};
+const FACE_OF_NORMAL = { '1,0,0': 'px', '-1,0,0': 'nx', '0,1,0': 'py', '0,-1,0': 'ny', '0,0,1': 'pz', '0,0,-1': 'nz' };
+
+const rig = new THREE.Group(); scene.add(rig);
+const cubeGroup = new THREE.Group(); rig.add(cubeGroup);
+
+const bodyMat = new THREE.MeshStandardMaterial({ color: 0x17171d, roughness: 0.25, metalness: 0.4 });
+const bodyGeo = new THREE.BoxGeometry(0.94, 0.94, 0.94);
+const stickerGeo = new THREE.PlaneGeometry(0.86, 0.86);
+const stickerMats = {};
+for (const k of Object.keys(FACE_COLORS)) {
+  stickerMats[k] = new THREE.MeshStandardMaterial({
+    color: FACE_COLORS[k], roughness: 0.16, metalness: 0.05,
+    emissive: FACE_COLORS[k], emissiveIntensity: 0.14,
+  });
+}
+const mirrorMats = {};
+for (const k of Object.keys(MIRROR_COLORS)) {
+  mirrorMats[k] = new THREE.MeshStandardMaterial({
+    color: MIRROR_COLORS[k], roughness: 0.28, metalness: 0.55,
+    emissive: MIRROR_COLORS[k], emissiveIntensity: 0.22,
+  });
+}
+// pillow: domed sticker (convex bump, like the bulging pillow cubes)
+const pillowGeo = new THREE.PlaneGeometry(0.86, 0.86, 6, 6);
+{
+  const p = pillowGeo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i);
+    p.setZ(i, 0.09 * (1 - (x / 0.43) * (x / 0.43)) * (1 - (y / 0.43) * (y / 0.43)));
+  }
+  pillowGeo.computeVertexNormals();
+}
+// mirror cube: ONE symmetric profile on every axis, so sizes permute
+// consistently under any 90-degree turn (corners 0.7, middle layer 1.6)
+const MW = [0.7, 1.6, 0.7];
+const MCENTERS = [-1.15, 0, 1.15];
+const STICKER_FACES = [
+  { key: 'px', n: new THREE.Vector3(1, 0, 0), rot: [0, Math.PI / 2, 0] },
+  { key: 'nx', n: new THREE.Vector3(-1, 0, 0), rot: [0, -Math.PI / 2, 0] },
+  { key: 'py', n: new THREE.Vector3(0, 1, 0), rot: [-Math.PI / 2, 0, 0] },
+  { key: 'ny', n: new THREE.Vector3(0, -1, 0), rot: [Math.PI / 2, 0, 0] },
+  { key: 'pz', n: new THREE.Vector3(0, 0, 1), rot: [0, 0, 0] },
+  { key: 'nz', n: new THREE.Vector3(0, 0, -1), rot: [0, Math.PI, 0] },
+];
+
+let N = 3;
+let SHAPE = 'cube';
+let cubies = [];
+function slotCenters(axis) {
+  if (SHAPE === 'mirror') return MCENTERS;
+  const out = [];
+  for (let i = 0; i < N; i++) out.push(i - (N - 1) / 2);
+  return out;
+}
+function layerCoord(axis, side) {
+  const c = slotCenters(axis);
+  return side > 0 ? c[c.length - 1] : c[0];
+}
+function snapCoord(axis, v) {
+  const c = slotCenters(axis);
+  let best = c[0], bd = Math.abs(v - c[0]);
+  for (let i = 1; i < c.length; i++) {
+    const d = Math.abs(v - c[i]);
+    if (d < bd) { bd = d; best = c[i]; }
+  }
+  return best;
+}
+function cubieSize(ix, iy, iz) {
+  if (SHAPE === 'mirror') return [MW[ix], MW[iy], MW[iz]];
+  return [1, 1, 1];
+}
+
+function buildCube(n, shape) {
+  if (shape === 'pyraminx') { buildPyramid(); return; }
+  cubeGroup.visible = true; pyrGroup.visible = false;
+  floor.visible = true;
+  for (const c of cubies) cubeGroup.remove(c);
+  cubies = [];
+  N = n;
+  SHAPE = shape || 'cube';
+  const cx = slotCenters('x'), cy = slotCenters('y'), cz = slotCenters('z');
+  for (let ix = 0; ix < N; ix++) for (let iy = 0; iy < N; iy++) for (let iz = 0; iz < N; iz++) {
+    const gx = cx[ix], gy = cy[iy], gz = cz[iz];
+    const sz = cubieSize(ix, iy, iz);
+    const g = new THREE.Group();
+    g.position.set(gx, gy, gz);
+    const body = new THREE.Mesh(
+      SHAPE === 'cube' ? bodyGeo : new THREE.BoxGeometry(sz[0] * 0.94, sz[1] * 0.94, sz[2] * 0.94),
+      bodyMat
+    );
+    body.castShadow = true; body.receiveShadow = true;
+    g.add(body);
+    g.userData = { gx, gy, gz, stickers: [] };
+    for (const sf of STICKER_FACES) {
+      const onFace =
+        (sf.key === 'px' && ix === N - 1) || (sf.key === 'nx' && ix === 0) ||
+        (sf.key === 'py' && iy === N - 1) || (sf.key === 'ny' && iy === 0) ||
+        (sf.key === 'pz' && iz === N - 1) || (sf.key === 'nz' && iz === 0);
+      if (!onFace) continue;
+      let st;
+      if (SHAPE === 'mirror') {
+        // sticker sized to the cubie's face: (depth x height) per axis
+        const w = sf.key === 'px' || sf.key === 'nx' ? sz[2] * 0.88 : sz[0] * 0.88;
+        const h = sf.key === 'py' || sf.key === 'ny' ? sz[2] * 0.88 : sz[1] * 0.88;
+        st = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mirrorMats[sf.key]);
+        const off = (sf.key === 'px' || sf.key === 'nx' ? sz[0] : sf.key === 'py' || sf.key === 'ny' ? sz[1] : sz[2]) / 2 + 0.006;
+        st.position.copy(sf.n).multiplyScalar(off);
+      } else if (SHAPE === 'pillow') {
+        st = new THREE.Mesh(pillowGeo, stickerMats[sf.key]);
+        st.position.copy(sf.n).multiplyScalar(0.475);
+      } else {
+        st = new THREE.Mesh(stickerGeo, stickerMats[sf.key]);
+        st.position.copy(sf.n).multiplyScalar(0.475);
+      }
+      st.rotation.set(sf.rot[0], sf.rot[1], sf.rot[2]);
+      st.castShadow = false;
+      g.add(st);
+      g.userData.stickers.push({ color: sf.key, normal: sf.n.clone() });
+    }
+    cubeGroup.add(g);
+    cubies.push(g);
+  }
+  camRadius = camRadiusT = N === 2 ? 7.5 : N === 3 ? 9.2 : N === 4 ? 11.5 : 13;
+  updateBestLabel();
+}
+
+// ------------------------------------------------------------ pyraminx (round 7)
+// Real Pyraminx mechanics, verified against the standard puzzle:
+// 4 faces x 9 small triangles = 36 stickers. Pieces: 4 tips (3 stickers),
+// 4 centers — one 3-colored piece under each tip (3 stickers), 6 edges
+// (2 stickers). Per face: 3 tips + 3 centers (the 3 downward triangles
+// next to the tips) + 3 edges (the 3 edge midpoints) = 9. A corner turn
+// about vertex V rotates the cap (tip V + center V + the 3 edges on V's
+// edges) by 120 degrees about the axis through the puzzle center and V.
+// Tips and centers sit ON the axis (rotate in place); the 3 edges cycle.
+const PYR_S = 3; // edge length
+const PYR_H = PYR_S * Math.sqrt(2 / 3);
+const PYR_TOP_Y = 3 * PYR_H / 4, PYR_BASE_Y = -PYR_H / 4;
+const PYR_V = {
+  U: new THREE.Vector3(0, PYR_TOP_Y, 0),
+  L: new THREE.Vector3(-PYR_S / 2, PYR_BASE_Y, PYR_S / (2 * Math.sqrt(3))),
+  R: new THREE.Vector3(PYR_S / 2, PYR_BASE_Y, PYR_S / (2 * Math.sqrt(3))),
+  B: new THREE.Vector3(0, PYR_BASE_Y, -PYR_S / Math.sqrt(3)),
+};
+// face winding is CCW seen from outside, so cross(V1-V0, V2-V0) = outward normal
+const PYR_FACES = [
+  { key: 'F', color: 0x00c853, v: ['U', 'L', 'R'] }, // front (green)
+  { key: 'R', color: 0xff1744, v: ['U', 'R', 'B'] }, // right (red)
+  { key: 'L', color: 0x2962ff, v: ['U', 'B', 'L'] }, // left (blue)
+  { key: 'D', color: 0xffd500, v: ['L', 'B', 'R'] }, // base (yellow)
+];
+for (const f of PYR_FACES) {
+  const V = f.v.map(k => PYR_V[k]);
+  f.p0 = V[0]; f.p1 = V[1]; f.p2 = V[2];
+  f.normal = new THREE.Vector3().crossVectors(
+    new THREE.Vector3().subVectors(V[1], V[0]),
+    new THREE.Vector3().subVectors(V[2], V[0])).normalize();
+}
+const pyrStickerMats = {};
+for (const f of PYR_FACES) {
+  pyrStickerMats[f.key] = new THREE.MeshStandardMaterial({
+    color: f.color, roughness: 0.16, metalness: 0.05,
+    emissive: f.color, emissiveIntensity: 0.14, side: THREE.DoubleSide,
+  });
+}
+const pyrGroup = new THREE.Group(); rig.add(pyrGroup); pyrGroup.visible = false;
+let pyrPieces = []; // piece Groups
+let pyrSlots = [];  // { pos: Vector3, verts: [vertex keys] } — canonical home slots
+// (u,v) slot triangles on a face: V0=top, V1=bottom-left, V2=bottom-right.
+// Upright (i,j): (i/3,j/3),((i+1)/3,j/3),(i/3,(j+1)/3). Inverted (i,j):
+// ((i+1)/3,j/3),((i+1)/3,(j+1)/3),(i/3,(j+1)/3) — CCW from outside.
+function pyrTri2D(i, j, inv) {
+  if (!inv) return [[i / 3, j / 3], [(i + 1) / 3, j / 3], [i / 3, (j + 1) / 3]];
+  return [[(i + 1) / 3, j / 3], [(i + 1) / 3, (j + 1) / 3], [i / 3, (j + 1) / 3]];
+}
+function pyrPointOnFace(f, u, v) {
+  return new THREE.Vector3()
+    .addScaledVector(new THREE.Vector3().subVectors(f.p1, f.p0), u)
+    .addScaledVector(new THREE.Vector3().subVectors(f.p2, f.p0), v)
+    .add(f.p0);
+}
+function buildPyramid() {
+  for (const c of cubies) cubeGroup.remove(c);
+  cubies = [];
+  for (const p of pyrPieces) pyrGroup.remove(p);
+  pyrPieces = [];
+  cubeGroup.visible = false; pyrGroup.visible = true;
+  floor.visible = false; // base face must be visible from below — floor would block it
+  N = 0; SHAPE = 'pyraminx';
+  // ---- collect the 36 sticker slots, grouped into 14 pieces
+  const slotDefs = [];
+  for (const f of PYR_FACES) {
+    const tris = [
+      { i: 0, j: 0, inv: false, kind: 'tip', at: f.v[0] },
+      { i: 1, j: 0, inv: false, kind: 'edge', edge: [f.v[0], f.v[1]] },
+      { i: 0, j: 0, inv: true, kind: 'center', at: f.v[0] },
+      { i: 0, j: 1, inv: false, kind: 'edge', edge: [f.v[0], f.v[2]] },
+      { i: 2, j: 0, inv: false, kind: 'tip', at: f.v[1] },
+      { i: 1, j: 0, inv: true, kind: 'center', at: f.v[1] },
+      { i: 1, j: 1, inv: false, kind: 'edge', edge: [f.v[1], f.v[2]] },
+      { i: 0, j: 1, inv: true, kind: 'center', at: f.v[2] },
+      { i: 0, j: 2, inv: false, kind: 'tip', at: f.v[2] },
+    ];
+    for (const t of tris) {
+      const pts2 = pyrTri2D(t.i, t.j, t.inv);
+      const pts3 = pts2.map(([u, v]) => pyrPointOnFace(f, u, v));
+      const c = new THREE.Vector3();
+      for (const p of pts3) c.add(p);
+      c.divideScalar(3);
+      const inset = pts3.map(p => c.clone().lerp(p, 0.9));
+      const world = inset.map(p => p.clone().addScaledVector(f.normal, 0.012));
+      slotDefs.push({ face: f, kind: t.kind, at: t.at, edge: t.edge, pts: world, centroid: c, normal: f.normal.clone() });
+    }
+  }
+  const pieceMap = new Map();
+  for (const s of slotDefs) {
+    let key, verts;
+    if (s.kind === 'tip' || s.kind === 'center') { key = s.kind + ':' + s.at; verts = [s.at]; }
+    else { const e = [...s.edge].sort(); key = 'edge:' + e.join('-'); verts = e; }
+    if (!pieceMap.has(key)) pieceMap.set(key, { key, kind: s.kind, verts, stickers: [] });
+    pieceMap.get(key).stickers.push(s);
+  }
+  for (const p of pieceMap.values()) {
+    const home = new THREE.Vector3();
+    for (const s of p.stickers) home.add(s.centroid);
+    home.divideScalar(p.stickers.length);
+    const g = new THREE.Group();
+    g.position.copy(home);
+    g.userData = { stickers: [], verts: p.verts, slot: -1 };
+    for (const s of p.stickers) {
+      const geo = new THREE.BufferGeometry();
+      const arr = new Float32Array(9);
+      s.pts.forEach((pt, idx) => {
+        const lp = pt.clone().sub(home);
+        arr[idx * 3] = lp.x; arr[idx * 3 + 1] = lp.y; arr[idx * 3 + 2] = lp.z;
+      });
+      geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+      geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, pyrStickerMats[s.face.key]);
+      mesh.userData.face = s.face.key;
+      g.add(mesh);
+      g.userData.stickers.push({ color: s.face.key, normal: s.normal.clone() });
+    }
+    pyrGroup.add(g);
+    pyrPieces.push(g);
+  }
+  // dark inner body (slightly smaller tetrahedron) so gaps read as shadow, not void
+  {
+    const sc = 0.94;
+    const v = {};
+    for (const k of Object.keys(PYR_V)) v[k] = PYR_V[k].clone().multiplyScalar(sc);
+    const tris = [[v.U, v.L, v.R], [v.U, v.R, v.B], [v.U, v.B, v.L], [v.L, v.B, v.R]];
+    const pos = new Float32Array(36);
+    tris.forEach((t, ti) => t.forEach((p, pi) => {
+      pos[(ti * 3 + pi) * 3] = p.x; pos[(ti * 3 + pi) * 3 + 1] = p.y; pos[(ti * 3 + pi) * 3 + 2] = p.z;
+    }));
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    const body = new THREE.Mesh(geo, bodyMat);
+    pyrGroup.add(body);
+  }
+  pyrSlots = pyrPieces.map((p, idx) => {
+    p.userData.slot = idx;
+    return { pos: p.position.clone(), verts: p.userData.verts };
+  });
+  camRadius = camRadiusT = 9.2;
+  updateBestLabel();
+}
+function nearestPyrSlot(pos) {
+  let best = 0, bd = Infinity;
+  for (let i = 0; i < pyrSlots.length; i++) {
+    const d = pos.distanceToSquared(pyrSlots[i].pos);
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
+function pyrUniformFaces() {
+  const perFace = {};
+  for (const p of pyrPieces) {
+    for (const st of p.userData.stickers) {
+      const w = st.normal.clone().applyQuaternion(p.quaternion);
+      let best = null, bestDot = -2;
+      for (const f of PYR_FACES) {
+        const d = w.dot(f.normal);
+        if (d > bestDot) { bestDot = d; best = f; }
+      }
+      if (bestDot < 0.9) continue;
+      (perFace[best.key] = perFace[best.key] || new Set()).add(st.color);
+    }
+  }
+  const out = {};
+  for (const f of PYR_FACES) {
+    const s = perFace[f.key];
+    out[f.key] = s ? { count: [...s].length, colors: [...s] } : { count: 0, colors: [] };
+  }
+  return out;
+}
+function pyrCheckSolved() {
+  if (S.state !== 'playing' && S.state !== 'ready') return;
+  const per = pyrUniformFaces();
+  const keys = Object.keys(per);
+  if (keys.length === 4 && keys.every(k => per[k].count === 1)) onSolved();
+}
+
+// ------------------------------------------------------------ particles
+const P_MAX = 700;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(P_MAX * 3);
+const pCol = new Float32Array(P_MAX * 3);
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+const points = new THREE.Points(pGeo, new THREE.PointsMaterial({
+  size: 0.16, vertexColors: true, transparent: true, opacity: 0.95,
+  blending: THREE.AdditiveBlending, depthWrite: false,
+}));
+points.frustumCulled = false;
+scene.add(points);
+let particles = [];
+function burst() {
+  const cols = Object.values(FACE_COLORS).map(c => new THREE.Color(c));
+  for (let i = 0; i < 420; i++) {
+    const dir = new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize();
+    const speed = 3 + rnd() * 7;
+    particles.push({
+      p: dir.clone().multiplyScalar(0.8 + rnd() * 1.6),
+      v: dir.multiplyScalar(speed).add(new THREE.Vector3(0, 2.5 + rnd() * 3, 0)),
+      life: 0, maxLife: 1.6 + rnd() * 1.2, col: cols[Math.floor(rnd() * cols.length)],
+    });
+  }
+  for (let i = 0; i < 220; i++) {
+    particles.push({
+      p: new THREE.Vector3((rnd() - 0.5) * 10, 5 + rnd() * 5, (rnd() - 0.5) * 10),
+      v: new THREE.Vector3((rnd() - 0.5) * 0.6, -0.8 - rnd() * 1.2, (rnd() - 0.5) * 0.6),
+      life: 0, maxLife: 3.5 + rnd() * 1.5, col: cols[Math.floor(rnd() * cols.length)],
+    });
+  }
+}
+function updateParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const pt = particles[i];
+    pt.life += dt;
+    if (pt.life >= pt.maxLife) { particles.splice(i, 1); continue; }
+    pt.v.y -= 5.5 * dt;
+    pt.p.addScaledVector(pt.v, dt);
+  }
+  for (let i = 0; i < P_MAX; i++) {
+    if (i < particles.length) {
+      const pt = particles[i];
+      pPos[i * 3] = pt.p.x; pPos[i * 3 + 1] = pt.p.y; pPos[i * 3 + 2] = pt.p.z;
+      pCol[i * 3] = pt.col.r; pCol[i * 3 + 1] = pt.col.g; pCol[i * 3 + 2] = pt.col.b;
+    } else {
+      pPos[i * 3 + 1] = -999;
+    }
+  }
+  pGeo.attributes.position.needsUpdate = true;
+  pGeo.attributes.color.needsUpdate = true;
+}
+
+// ------------------------------------------------------------ state + HUD
+const ROUND_DONE_WAIT = 0.5; // s of game time on the round-cleared banner before advancing
+const S = {
+  state: 'title', // title | ready | playing | roundDone | won
+  mode: 'campaign', // campaign | free
+  roundIdx: 0,
+  totalMs: 0, totalMoves: 0,
+  moves: 0, t0: 0, finalMs: 0, chaos: false, lastChaos: 0,
+  scrambleMoves: [], history: [],
+  roundDoneAt: 0, wonAt: 0, overShown: false,
+};
+let gameTime = 0;
+let camTheta = -0.6, camPhi = 1.15, camRadius = 9.2;
+let camThetaT = camTheta, camPhiT = camPhi, camRadiusT = camRadius;
+let lookY = 1.5, lookYT = 1.5;
+let lastInteract = 0;
+
+const el = id => document.getElementById(id);
+function fmt(ms) {
+  const t = Math.max(0, ms);
+  const m = Math.floor(t / 60000), s = Math.floor(t / 1000) % 60, d = Math.floor(t / 100) % 10;
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') + '.' + d;
+}
+function bestKey() {
+  return S.mode === 'campaign' ? 'rubik3d-best-campaign' : 'rubik3d-best-' + N;
+}
+function getBest() { try { const v = localStorage.getItem(bestKey()); return v ? parseFloat(v) : null; } catch (e) { return null; } }
+function setBest(ms) { try { localStorage.setItem(bestKey(), String(ms)); } catch (e) { /* ignore */ } }
+function updateBestLabel() { const b = getBest(); el('best').textContent = b == null ? '--:--' : fmt(b); }
+function displayMs() {
+  if (S.mode === 'campaign') {
+    return S.totalMs + (S.state === 'playing' ? (gameTime - S.t0) * 1000 : 0);
+  }
+  return S.state === 'playing' ? (gameTime - S.t0) * 1000 : (S.state === 'won' ? S.finalMs : 0);
+}
+function updateHUD() {
+  el('moves').textContent = S.mode === 'campaign' ? S.totalMoves + S.moves : S.moves;
+  el('level').textContent = S.mode === 'campaign'
+    ? 'R' + (S.roundIdx + 1) + '/7 · ' + ROUNDS[S.roundIdx].label
+    : N + '×' + N;
+  el('chaosTag').classList.toggle('hidden', !S.chaos);
+  el('bChaos').textContent = 'CHAOS: ' + (S.chaos ? 'ON' : 'OFF');
+  el('bChaos').classList.toggle('on', S.chaos);
+  el('bRounds').classList.toggle('lvl-on', S.mode === 'campaign');
+  for (const b of document.querySelectorAll('#btns button[data-n]')) {
+    b.classList.toggle('lvl-on', S.mode === 'free' && parseInt(b.dataset.n, 10) === N);
+  }
+  el('time').textContent = fmt(displayMs());
+}
+function setTitleCta() {
+  el('titleCta').textContent = S.mode === 'campaign'
+    ? 'Press SPACE or tap ROUNDS to start'
+    : 'Press SPACE to scramble · or tap ROUNDS for the campaign';
+}
+function showTitle() {
+  S.state = 'title';
+  el('title').classList.remove('hidden');
+  el('over').classList.add('hidden');
+  el('solvedBanner').classList.remove('show');
+  setTitleCta();
+}
+function hideTitle() { el('title').classList.add('hidden'); }
+
+// ------------------------------------------------------------ rounds
+function clearTwists() {
+  twistQueue.length = 0;
+  if (activeTwist) { activeTwist.parent.remove(activeTwist.pivot); activeTwist = null; }
+}
+function startRound(i) {
+  clearTwists();
+  particles = [];
+  S.roundIdx = i;
+  const r = ROUNDS[i];
+  buildCube(r.n, r.shape);
+  S.moves = 0; S.finalMs = 0; S.chaos = false; S.lastChaos = 0; S.history = []; S.scrambleMoves = [];
+  lastShownTenth = -1;
+  el('solvedBanner').classList.remove('show');
+  el('over').classList.add('hidden');
+  S.overShown = false;
+  updateHUD();
+  hideTitle();
+  S.state = 'ready';
+  scramble();
+}
+function startCampaign() {
+  S.mode = 'campaign';
+  S.totalMs = 0; S.totalMoves = 0;
+  startRound(0);
+}
+function roundSolved() {
+  const roundMs = (gameTime - S.t0) * 1000;
+  S.totalMs += roundMs;
+  S.totalMoves += S.moves;
+  S.moves = 0; // HUD must show the campaign total only — not total + this round twice
+  S.state = 'roundDone';
+  S.roundDoneAt = gameTime;
+  burst();
+  const last = S.roundIdx === ROUNDS.length - 1;
+  el('solvedBanner').textContent = last
+    ? '★ CAMPAIGN COMPLETE! ★'
+    : '★ ROUND ' + (S.roundIdx + 1) + '/7 CLEARED! → ' + ROUNDS[S.roundIdx + 1].label + ' ★';
+  el('solvedBanner').classList.add('show');
+  updateHUD();
+}
+function campaignComplete() {
+  S.state = 'won';
+  S.wonAt = gameTime;
+  S.overShown = false;
+  const best = getBest();
+  if (best == null || S.totalMs < best) setBest(S.totalMs);
+  updateBestLabel();
+  el('overTitle').textContent = 'CAMPAIGN COMPLETE!';
+  el('finalStats').textContent = 'Total time ' + fmt(S.totalMs) + ' · ' + S.totalMoves + (S.totalMoves === 1 ? ' move' : ' moves');
+  el('bestLine').textContent = 'Best campaign ' + fmt(getBest());
+  updateHUD();
+}
+function freeSolved() {
+  S.state = 'won';
+  S.wonAt = gameTime;
+  S.overShown = false;
+  S.finalMs = (gameTime - S.t0) * 1000;
+  const best = getBest();
+  if (best == null || S.finalMs < best) setBest(S.finalMs);
+  updateBestLabel();
+  burst();
+  el('solvedBanner').textContent = '★ SOLVED! ★';
+  el('solvedBanner').classList.add('show');
+  el('overTitle').textContent = 'SOLVED!';
+  el('finalStats').textContent = 'Time ' + fmt(S.finalMs) + ' · ' + S.moves + (S.moves === 1 ? ' move' : ' moves');
+  el('bestLine').textContent = 'Best time ' + fmt(getBest()) + ' (' + N + '×' + N + ')';
+  updateHUD();
+}
+function onSolved() {
+  if (S.mode === 'campaign') roundSolved();
+  else freeSolved();
+}
+function resetLevel(n) {
+  clearTwists();
+  particles = [];
+  S.mode = 'free';
+  buildCube(n || N, 'cube');
+  S.moves = 0; S.finalMs = 0; S.chaos = false; S.lastChaos = 0; S.history = []; S.scrambleMoves = [];
+  lastShownTenth = -1;
+  el('time').textContent = '00:00.0';
+  el('solvedBanner').classList.remove('show');
+  updateHUD();
+  showTitle();
+}
+
+// ------------------------------------------------------------ twists
+let activeTwist = null;
+const twistQueue = [];
+
+function startTwist(axis, layer, dir, kind, dur, onDone) {
+  const layerCubies = cubies.filter(c => {
+    const v = axis === 'x' ? c.userData.gx : axis === 'y' ? c.userData.gy : c.userData.gz;
+    return Math.abs(v - layer) < 0.01;
+  });
+  if (!layerCubies.length) return false;
+  const pivot = new THREE.Group();
+  cubeGroup.add(pivot);
+  for (const c of layerCubies) pivot.attach(c);
+  activeTwist = { shape: 'cube', parent: cubeGroup, pivot, axis, angle: dir * Math.PI / 2, t: 0, dur, kind, onDone, cubies: layerCubies };
+  return true;
+}
+function startPyrTwist(vertex, dir, kind, dur, onDone) {
+  const cap = pyrPieces.filter(p => pyrSlots[p.userData.slot].verts.includes(vertex));
+  if (!cap.length) return false;
+  const pivot = new THREE.Group();
+  pyrGroup.add(pivot);
+  for (const p of cap) pivot.attach(p);
+  const axis = PYR_V[vertex].clone().normalize();
+  activeTwist = { shape: 'pyr', parent: pyrGroup, pivot, axisVec: axis, angle: dir * 2 * Math.PI / 3, t: 0, dur, kind, onDone, pieces: cap };
+  return true;
+}
+function finalizeTwist(tw) {
+  tw.pivot.updateMatrixWorld(true);
+  const done = [...tw.pivot.children];
+  for (const c of done) {
+    tw.parent.attach(c);
+    if (tw.shape === 'pyr') {
+      const si = nearestPyrSlot(c.position);
+      c.position.copy(pyrSlots[si].pos);
+      c.quaternion.normalize();
+      c.userData.slot = si;
+    } else {
+      c.position.set(snapCoord('x', c.position.x), snapCoord('y', c.position.y), snapCoord('z', c.position.z));
+      c.quaternion.normalize();
+      c.userData.gx = c.position.x; c.userData.gy = c.position.y; c.userData.gz = c.position.z;
+    }
+  }
+  tw.parent.remove(tw.pivot);
+  activeTwist = null;
+  if (tw.kind === 'player') {
+    S.moves++;
+    if (S.state === 'ready') { S.state = 'playing'; S.t0 = gameTime; }
+    updateHUD();
+  }
+  if (tw.onDone) tw.onDone();
+  if (tw.kind !== 'scramble') checkSolved();
+  pumpQueue();
+}
+function pumpQueue() {
+  if (activeTwist || !twistQueue.length) return;
+  const tw = twistQueue.shift();
+  if (tw.shape === 'pyr') startPyrTwist(tw.vertex, tw.dir, tw.kind, tw.dur, tw.onDone);
+  else startTwist(tw.axis, tw.layer, tw.dir, tw.kind, tw.dur, tw.onDone);
+}
+function queueTwist(desc) {
+  twistQueue.push(desc);
+  pumpQueue();
+}
+function twistFace(face, dir, kind, dur) {
+  if (SHAPE === 'pyraminx') {
+    // cube face letter -> pyramid corner: U/F = top, L = left, R = right, B/D = bottom
+    const v = { U: 'U', F: 'U', L: 'L', R: 'R', B: 'B', D: 'B' }[face];
+    if (!v) return false;
+    const d = dir == null ? 1 : dir;
+    queueTwist({ shape: 'pyr', vertex: v, dir: d, kind: kind || 'player', dur: dur || 0.32 });
+    if (kind !== 'scramble') S.history.push({ vertex: v, dir: d });
+    return true;
+  }
+  const f = FACES[face];
+  if (!f) return false;
+  const layerVal = layerCoord(f.axis, f.layer);
+  const d = dir == null ? f.dir : dir;
+  queueTwist({ shape: 'cube', axis: f.axis, layer: layerVal, dir: d, kind: kind || 'player', dur: dur || 0.32 });
+  if (kind !== 'scramble') S.history.push({ face, dir: d });
+  return true;
+}
+function scramble(k, record) {
+  if (S.state === 'won') return;
+  hideTitle();
+  S.state = 'ready';
+  S.moves = 0; S.finalMs = 0; lastShownTenth = -1;
+  el('time').textContent = fmt(displayMs());
+  updateHUD();
+  S.scrambleMoves = [];
+  S.history = [];
+  if (SHAPE === 'pyraminx') {
+    const count = k || 14;
+    let prev = null;
+    for (let i = 0; i < count; i++) {
+      let v;
+      do { v = pick(['U', 'L', 'R', 'B']); } while (prev && v === prev);
+      const dir = pick([1, -1]);
+      prev = v;
+      S.scrambleMoves.push({ vertex: v, dir });
+      S.history.push({ vertex: v, dir });
+      queueTwist({ shape: 'pyr', vertex: v, dir, kind: 'scramble', dur: 0.1 });
+    }
+    return;
+  }
+  let prev = null;
+  const count = k || (N === 2 ? 10 : N === 3 ? 20 : N === 4 ? 28 : 36);
+  for (let i = 0; i < count; i++) {
+    let face;
+    do { face = pick(Object.keys(FACES)); } while (prev && face === prev.face);
+    const dir = pick([1, -1]);
+    prev = { face, dir };
+    S.scrambleMoves.push({ face, dir });
+    S.history.push({ face, dir });
+    const f = FACES[face];
+    queueTwist({ shape: 'cube', axis: f.axis, layer: layerCoord(f.axis, f.layer), dir, kind: 'scramble', dur: 0.1 });
+  }
+}
+function undoHistory(dur) {
+  const inv = [...S.history].reverse();
+  S.history = [];
+  for (const m of inv) {
+    if (m.vertex) {
+      queueTwist({ shape: 'pyr', vertex: m.vertex, dir: -m.dir, kind: 'player', dur: dur || 0.22 });
+    } else if (m.face) {
+      const f = FACES[m.face];
+      queueTwist({ shape: 'cube', axis: f.axis, layer: layerCoord(f.axis, f.layer), dir: -m.dir, kind: 'player', dur: dur || 0.22 });
+    } else {
+      queueTwist({ shape: 'cube', axis: m.twistAxis, layer: m.layer, dir: -m.dir, kind: 'player', dur: dur || 0.22 });
+    }
+  }
+}
+function checkSolved() {
+  if (SHAPE === 'pyraminx') { pyrCheckSolved(); return; }
+  if (S.state !== 'playing' && S.state !== 'ready') return;
+  const perFace = {};
+  for (const c of cubies) {
+    for (const st of c.userData.stickers) {
+      const w = st.normal.clone().applyQuaternion(c.quaternion);
+      const key = FACE_OF_NORMAL[[Math.round(w.x), Math.round(w.y), Math.round(w.z)].join(',')];
+      if (!key) continue;
+      (perFace[key] = perFace[key] || new Set()).add(st.color);
+    }
+  }
+  const keys = Object.keys(perFace);
+  if (keys.length === 6 && keys.every(k => perFace[k].size === 1)) onSolved();
+}
+
+// ------------------------------------------------------------ input: drag twist / orbit
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+let drag = null;
+
+function setNDC(e) {
+  const r = canvas.getBoundingClientRect();
+  pointerNDC.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+}
+function screenDir(worldVec, atPoint) {
+  const a = atPoint.clone().project(camera);
+  const b = atPoint.clone().add(worldVec).project(camera);
+  return new THREE.Vector2(b.x - a.x, -(b.y - a.y));
+}
+canvas.addEventListener('pointerdown', e => {
+  lastInteract = gameTime;
+  if (S.state === 'title') { hideTitle(); S.state = 'ready'; }
+  canvas.setPointerCapture(e.pointerId);
+  setNDC(e);
+  raycaster.setFromCamera(pointerNDC, camera);
+  if (SHAPE === 'pyraminx') {
+    const hits = raycaster.intersectObjects(pyrGroup.children, true);
+    if (hits.length) {
+      const h = hits[0];
+      let face = null;
+      if (h.object.userData.face) face = PYR_FACES.find(f => f.key === h.object.userData.face);
+      if (!face) {
+        const nWorld = h.face.normal.clone().transformDirection(h.object.matrixWorld);
+        let best = null, bestDot = -2;
+        for (const f of PYR_FACES) { const d = nWorld.dot(f.normal); if (d > bestDot) { bestDot = d; best = f; } }
+        face = best;
+      }
+      drag = { mode: 'maybe-pyr-twist', x0: e.clientX, y0: e.clientY, hit: h.point.clone(), face };
+    } else {
+      drag = { mode: 'orbit', x0: e.clientX, y0: e.clientY };
+    }
+    return;
+  }
+  const hits = raycaster.intersectObjects(cubeGroup.children, true);
+  if (hits.length) {
+    const h = hits[0];
+    let cubie = h.object;
+    while (cubie.parent !== cubeGroup) cubie = cubie.parent;
+    const nWorld = h.face.normal.clone().transformDirection(h.object.matrixWorld);
+    drag = { mode: 'maybe-twist', x0: e.clientX, y0: e.clientY, hit: h.point.clone(), normal: nWorld, cubie };
+  } else {
+    drag = { mode: 'orbit', x0: e.clientX, y0: e.clientY };
+  }
+});
+canvas.addEventListener('pointermove', e => {
+  if (!drag) return;
+  lastInteract = gameTime;
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+  if (drag.mode === 'orbit') {
+    camThetaT -= dx * 0.005; camPhiT -= dy * 0.005;
+    camPhiT = Math.max(0.2, Math.min(Math.PI - 0.2, camPhiT));
+    drag.x0 = e.clientX; drag.y0 = e.clientY;
+    return;
+  }
+  if (drag.mode === 'maybe-pyr-twist') {
+    if (Math.hypot(dx, dy) < 14) return;
+    // pick the (vertex, dir) whose surface motion best matches the drag:
+    // velocity of the hit point under a turn about vertex V is axis_V x r
+    const delta = new THREE.Vector2(dx, dy);
+    const r = drag.hit.clone(); // puzzle center is the origin (rig bob is negligible)
+    let best = null, bestScore = 0.5;
+    for (const vk of drag.face.v) {
+      const axis = PYR_V[vk].clone().normalize();
+      for (const dir of [1, -1]) {
+        const vel = new THREE.Vector3().crossVectors(axis, r).multiplyScalar(dir);
+        const vs = screenDir(vel, drag.hit);
+        if (vs.lengthSq() < 1e-6) continue;
+        const score = Math.abs(delta.clone().normalize().dot(vs.clone().normalize()));
+        if (score > bestScore) { bestScore = score; best = { vertex: vk, dir }; }
+      }
+    }
+    if (!best) { drag = { mode: 'orbit', x0: e.clientX, y0: e.clientY }; return; }
+    drag = { mode: 'done' };
+    if (S.state === 'title') { hideTitle(); S.state = 'ready'; }
+    if (S.state === 'won' || S.state === 'roundDone') return;
+    queueTwist({ shape: 'pyr', vertex: best.vertex, dir: best.dir, kind: 'player', dur: 0.32 });
+    S.history.push({ vertex: best.vertex, dir: best.dir });
+    return;
+  }
+  if (drag.mode === 'maybe-twist') {
+    if (Math.hypot(dx, dy) < 14) return;
+    const n = drag.normal;
+    const axes = ['x', 'y', 'z'].filter(a => Math.abs(n.dot(AXES[a])) < 0.5);
+    if (axes.length !== 2) { drag = null; return; }
+    const delta = new THREE.Vector2(dx, dy);
+    let bestA = null, bestScore = -1;
+    for (const a of axes) {
+      const d2 = screenDir(AXES[a], drag.hit);
+      const score = Math.abs(delta.clone().normalize().dot(d2.clone().normalize()));
+      if (score > bestScore) { bestScore = score; bestA = a; }
+    }
+    const twistAxis = axes.find(a => a !== bestA);
+    const layer = twistAxis === 'x' ? drag.cubie.userData.gx : twistAxis === 'y' ? drag.cubie.userData.gy : drag.cubie.userData.gz;
+    const axisVec = AXES[twistAxis];
+    const c = axisVec.clone().multiplyScalar(drag.hit.dot(axisVec));
+    const r = drag.hit.clone().sub(c);
+    const vel = new THREE.Vector3().crossVectors(axisVec, r);
+    const velScreen = screenDir(vel, drag.hit);
+    const dir = velScreen.dot(delta) > 0 ? 1 : -1;
+    drag = { mode: 'done' };
+    if (S.state === 'title') { hideTitle(); S.state = 'ready'; }
+    if (S.state === 'won' || S.state === 'roundDone') return;
+    queueTwist({ shape: 'cube', axis: twistAxis, layer, dir, kind: 'player', dur: 0.32 });
+    S.history.push({ twistAxis, layer, dir });
+  }
+});
+canvas.addEventListener('pointerup', () => { drag = null; });
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  camRadiusT = Math.max(5, Math.min(16, camRadiusT * Math.exp(e.deltaY * 0.001)));
+}, { passive: false });
+
+// WASD/QE twist (user spec): W = Up, S = Down, A = Left, D = Right, Q = Front, E = Back.
+// On the pyramid the 4 corners are U/L/R/B: W/Q = top, A = left, D = right, S/E = bottom.
+// 'd' means Right here (WASD wins over the old UDFLRB 'd' = Down); Down is 's'.
+// 'r' stays restart (it also says so on the win overlay); Right is reached via 'd'.
+const CUBE_KEYMAP = { w: 'U', u: 'U', s: 'D', a: 'L', l: 'L', d: 'R', q: 'F', f: 'F', e: 'B', b: 'B' };
+const PYR_KEYMAP = { w: 'U', q: 'U', u: 'U', f: 'U', a: 'L', l: 'L', s: 'B', e: 'B', b: 'B', d: 'R' };
+const heldKeys = new Set();
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k.startsWith('arrow')) {
+    heldKeys.add(e.key);
+    e.preventDefault();
+    lastInteract = gameTime;
+    return;
+  }
+  if (e.repeat) return;
+  lastInteract = gameTime;
+  if (k === ' ') {
+    e.preventDefault();
+    if (S.state === 'title') { S.mode === 'campaign' ? startCampaign() : scramble(); }
+    else if (S.state === 'won') { S.mode === 'campaign' ? startCampaign() : resetLevel(N); }
+    else scramble();
+  }
+  else if (k === 'r') { S.mode === 'campaign' ? startCampaign() : resetLevel(N); }
+  else if (k === 'g') startCampaign();
+  else if (k === 'c') { S.chaos = !S.chaos; S.lastChaos = gameTime; updateHUD(); }
+  else if (k === '1') resetLevel(2);
+  else if (k === '2') resetLevel(3);
+  else if (k === '3') resetLevel(4);
+  else if (SHAPE === 'pyraminx' && PYR_KEYMAP[k]) {
+    if (S.state === 'title') { hideTitle(); S.state = 'ready'; }
+    if (S.state === 'won' || S.state === 'roundDone') return;
+    twistFace(PYR_KEYMAP[k], e.shiftKey ? -1 : 1, 'player', 0.32);
+  }
+  else if (CUBE_KEYMAP[k]) {
+    if (S.state === 'title') { hideTitle(); S.state = 'ready'; }
+    if (S.state === 'won' || S.state === 'roundDone') return;
+    const face = CUBE_KEYMAP[k];
+    const f = FACES[face];
+    twistFace(face, e.shiftKey ? -f.dir : f.dir, 'player', 0.32);
+  }
+});
+window.addEventListener('keyup', e => {
+  if (e.key.startsWith('Arrow')) heldKeys.delete(e.key);
+});
+el('bScramble').addEventListener('click', () => {
+  lastInteract = gameTime;
+  if (S.state === 'title') { S.mode === 'campaign' ? startCampaign() : scramble(); }
+  else if (S.state === 'won') { S.mode === 'campaign' ? startCampaign() : resetLevel(N); }
+  else scramble();
+});
+el('bChaos').addEventListener('click', () => { S.chaos = !S.chaos; S.lastChaos = gameTime; updateHUD(); });
+el('bRounds').addEventListener('click', () => { lastInteract = gameTime; startCampaign(); });
+for (const b of document.querySelectorAll('#btns button[data-n]')) {
+  b.addEventListener('click', () => resetLevel(parseInt(b.dataset.n, 10)));
+}
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ------------------------------------------------------------ frame loop
+let lastShownTenth = -1;
+function frame(dt) {
+  gameTime += dt;
+  if (activeTwist) {
+    activeTwist.t += dt;
+    const f = Math.min(1, activeTwist.t / activeTwist.dur);
+    const e2 = f < 0.5 ? 4 * f * f * f : 1 - Math.pow(-2 * f + 2, 3) / 2;
+    if (activeTwist.shape === 'pyr') {
+      activeTwist.pivot.quaternion.setFromAxisAngle(activeTwist.axisVec, e2 * activeTwist.angle);
+    } else {
+      activeTwist.pivot.rotation[activeTwist.axis] = e2 * activeTwist.angle;
+    }
+    if (f >= 1) finalizeTwist(activeTwist);
+  }
+  // round-cleared countdown -> advance (deterministic, game time)
+  if (S.state === 'roundDone' && gameTime - S.roundDoneAt >= ROUND_DONE_WAIT) {
+    if (S.roundIdx < ROUNDS.length - 1) startRound(S.roundIdx + 1);
+    else campaignComplete();
+  }
+  // win overlay appears 1.0 s after the win (deterministic, game time)
+  if (S.state === 'won' && !S.overShown && gameTime - S.wonAt >= 1.0) {
+    S.overShown = true;
+    el('over').classList.remove('hidden');
+    el('solvedBanner').classList.remove('show'); // banner says the same thing — don't double-print it behind the overlay
+  }
+  // chaos mode
+  if (S.chaos && S.state === 'playing' && gameTime - S.lastChaos >= CHAOS_SEC) {
+    S.lastChaos = gameTime;
+    if (SHAPE === 'pyraminx') {
+      const v = pick(['U', 'L', 'R', 'B']);
+      const dir = pick([1, -1]);
+      queueTwist({ shape: 'pyr', vertex: v, dir, kind: 'chaos', dur: 0.12 });
+    } else {
+      const face = pick(Object.keys(FACES));
+      const dir = pick([1, -1]);
+      const f = FACES[face];
+      queueTwist({ shape: 'cube', axis: f.axis, layer: layerCoord(f.axis, f.layer), dir, kind: 'chaos', dur: 0.12 });
+    }
+  }
+  // timer HUD (tenths)
+  const tenth = Math.floor(displayMs() / 100);
+  if (tenth !== lastShownTenth) { lastShownTenth = tenth; el('time').textContent = fmt(displayMs()); }
+  if (S.chaos && S.state === 'playing') el('chaosIn').textContent = Math.max(0, Math.ceil(CHAOS_SEC - (gameTime - S.lastChaos)));
+  // camera: damping + idle auto-rotate on title / celebration spin on win
+  if (S.state === 'title' && gameTime - lastInteract > 3) camThetaT += 0.0016;
+  if (S.state === 'won') camThetaT += 0.0012;
+  // arrow keys: smooth responsive orbit (speedcuber angle changes)
+  if (heldKeys.has('ArrowLeft')) camThetaT += 2.4 * dt;
+  if (heldKeys.has('ArrowRight')) camThetaT -= 2.4 * dt;
+  if (heldKeys.has('ArrowUp')) camPhiT = Math.max(0.2, camPhiT - 1.8 * dt);
+  if (heldKeys.has('ArrowDown')) camPhiT = Math.min(Math.PI - 0.2, camPhiT + 1.8 * dt);
+  camTheta += (camThetaT - camTheta) * 0.08;
+  camPhi += (camPhiT - camPhi) * 0.08;
+  camRadius += (camRadiusT - camRadius) * 0.08;
+  // title screen: look above the cube so it sits below the title text (no overlap)
+  lookYT = S.state === 'title' ? 1.5 : 0;
+  lookY += (lookYT - lookY) * 0.08;
+  camera.position.set(
+    camRadius * Math.sin(camPhi) * Math.sin(camTheta),
+    camRadius * Math.cos(camPhi),
+    camRadius * Math.sin(camPhi) * Math.cos(camTheta)
+  );
+  camera.lookAt(0, lookY, 0);
+  rig.position.y = Math.sin(gameTime * 0.8) * 0.06;
+  dust.rotation.y = gameTime * 0.01;
+  updateParticles(dt);
+  renderer.render(scene, camera);
+}
+
+// ------------------------------------------------------------ boot + test hooks
+buildCube(ROUNDS[0].n, ROUNDS[0].shape); // title backdrop = round 1 Mini cube
+updateHUD();
+showTitle();
+window.__cube = {
+  S, twistFace, scramble, undoHistory, resetLevel, startCampaign,
+  setLevel: n => resetLevel(n),
+  setRound: i => { S.mode = 'campaign'; S.totalMs = 0; S.totalMoves = 0; startRound(i); },
+  toggleChaos: () => { S.chaos = !S.chaos; S.lastChaos = gameTime; updateHUD(); },
+  orbit: (dT, dP) => { camThetaT += dT; camPhiT = Math.max(0.2, Math.min(Math.PI - 0.2, camPhiT + dP)); },
+  pyrUniform: () => (SHAPE === 'pyraminx' ? pyrUniformFaces() : null),
+  pyrPieces: () => pyrPieces.length,
+  idle: () => !activeTwist && twistQueue.length === 0,
+  state: () => ({ state: S.state, mode: S.mode, round: S.roundIdx, roundName: ROUNDS[S.roundIdx].label, shape: SHAPE, N, moves: S.moves, totalMoves: S.totalMoves, timeMs: displayMs(), totalMs: S.totalMs, solved: S.state === 'won', chaos: S.chaos, particles: particles.length }),
+  cam: () => ({ theta: camTheta, phi: camPhi, radius: camRadius, pos: camera.position.toArray() }),
+  ready: false,
+};
+if (FIXED) {
+  window.__step = () => frame(1 / 30);
+} else {
+  let last = performance.now();
+  const loop = now => {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    frame(dt);
+    requestAnimationFrame(loop);
+  };
+  requestAnimationFrame(loop);
+}
+frame(0);
+window.__cube.ready = true;
+})();
+</script>
+</body>
+</html>
